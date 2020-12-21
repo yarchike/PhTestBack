@@ -1,8 +1,14 @@
 package com.martynov
 
+import com.martynov.repository.UserRepository
+import com.martynov.repository.UserRepositoryInMemoryWithMutexImpl
 import com.martynov.route.RoutingV1
 import com.martynov.service.FileService
+import com.martynov.service.JWTTokenService
+import com.martynov.service.UserService
 import io.ktor.application.*
+import io.ktor.auth.*
+import io.ktor.auth.jwt.*
 import io.ktor.response.*
 import io.ktor.request.*
 import io.ktor.routing.*
@@ -45,7 +51,21 @@ fun Application.module(testing: Boolean = false) {
                 instance()
             )
         }
+        bind<UserService>() with eagerSingleton { UserService(instance()) }
+        bind<UserRepository>() with eagerSingleton { UserRepositoryInMemoryWithMutexImpl() }
+        bind<JWTTokenService>() with eagerSingleton { JWTTokenService() }
+    }
+    install(Authentication) {
+        jwt {
+            val jwtServisce by kodein().instance<JWTTokenService>()
+            verifier(jwtServisce.verifier)
+            val userService by kodein().instance<UserService>()
 
+            validate {
+                val id = it.payload.getClaim("id").asLong()
+                userService.getModelByid(id)
+            }
+        }
     }
     install(Routing) {
         val routingV1 by kodein().instance<RoutingV1>()
